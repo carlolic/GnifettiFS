@@ -1,0 +1,59 @@
+
+
+- This repository contains files to run the full Stokes ice-flow model of the high-Alpine glacier saddle Colle Gnifetti, Swiss/Italian Alps, described in Licciulli et al. (2019). The model is implemented using the Finite Element software Elmer/Ice (http://elmerice.elmerfem.org/). Results in the paper were calculated using the Elmer version 8.2 (Rev: a5adc1d), however more recent Elmer versions should work as well (see git repository of Elmer: https://github.com/ElmerCSC/elmerfem).
+
+- This repository contains .sif files, mesh files, input data, solvers and user functions (USFs). Solvers and USFs in this repository are not available in the git repository of Elmer.
+
+- Solvers and USFs must be compiled typing: "elmerf90 MySolver.F90 -o MySolver" (the same for USFs)
+
+- For questions/comments please contact Carlo Licciulli (carlo.licciulli@badw.de), Bavarian Academy of Sciences and Humanities, Munich, Germany.
+
+
+############
+ .sif files:
+############
+
+- gnifetti.sif : transient evolution of velocity and density field with constant forcing
+- gnifetti_enthalpy_steady.sif : steady-state calculation of a temperature field with prescribed velocity and density 
+- gnifetti_enthalpy_yearly.sif : transient evolution of velocity, density and temperature field with time-dependent temperature forcing
+- gnifetti_freesurface.sif : calculation of surface accumulation using the free-surface equation and assuming steady-state
+- gnifetti_age.sif : calculation of the age field
+- gnifetti_particles_KCC.sif : trajectory calculation of passive tracers to estimate borehole deformation at KCC
+- gnifetti_particles_KCI.sif : trajectory calculation of passive tracers to estimate borehole deformation at KCI
+
+
+############
+ Input data:
+############
+
+- BasalHeatFluxDEM.dat : prescribed basal heat flux map
+- BedrockDEM.dat : bedrock topography
+- Tdev_yy.dat : time series of Tdev (see Licciulli et al., 2019)
+- Tpos_yy.dat : time series of T+ (see Licciulli et al., 2019)
+- start_reldensity.dat : initial relative density profile
+- SurfaceDEM.dat : surface topography
+- SurfaceTemperatureDEM.dat : prescribed steady surface temperatures Ts (see Licciulli et al., 2019)
+
+
+############
+ Solvers:
+############
+
+- LocalAdvectionReaction.F90 : solver similar to "AdvectionReaction.F90" (see git repository of Elmer), but including "bubbles" and "SUPG" stabilization methods (see references in Licciulli et al., 2019). This solver was provided by IGE-Grenoble and is still in development
+- DeformationalHeat_Porous.F90 : calculation of deformational heat from strain and deviatoric stress tensor
+
+Other required executables (copies of existing executables):
+- LocalAdvectionReaction_dating: copy of "LocalAdvectionReaction" executable
+- GGSaveData, KCCSaveData, KCISaveData, KCHSaveData, CCSaveData, KCSSaveData, CG03SaveData, CG82SaveData, ZumSaveData, NormSaveData, KCC_strain_stress_SaveData: copy of "SaveData" executable ("path-to-elmer-installation/share/elmersolver/lib/SaveData.so")
+
+
+############
+ USFs:
+############
+
+- USF_Fluidity_B.f90 : Fluidity values at different temperatures (taken from Cuffey and Paterson, 2010)
+- USF_EnthalpyDiffusivity.f90 : Calculation of Enthalpy diffusivity as a function of temperature and relative density
+- USF_NormalForce.f90 : Calculation of normal stress on the Grenzgletscher boundary considering the presence of a large crevasse
+- USF_SurfaceEnthalpy_yearly.f90 : Calculation of surface enthalpy (space and time dependent) considering steady surface temperatures Ts ("DATA/SurfaceTemperatureDEM.dat"), Tdev ("DATA/Tdev_yy.dat"), T+ ("DATA/Tpos_yy.dat") and melt factor. 
+
+

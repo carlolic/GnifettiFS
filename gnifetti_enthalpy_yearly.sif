@@ -1,0 +1,768 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Colle Gnifetti Ice Flow Model
+!
+! All units are in MPa - m - a 
+! Temperature is in Kelvin
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+check keywords warn
+ echo on
+
+!Define the parameter in MPa - a - m
+
+$yearinsec = 365.25*24*60*60
+$gravity = -9.81 * yearinsec^2
+$rhoi = 900.0 / (1.0e6*yearinsec^2)
+$rhow = 1000.0 / (1.0e6*yearinsec^2) 
+
+$A1 = 2.89165e-13 * yearinsec*1.0e18 
+$A2 = 2.42736e-02 * yearinsec*1.0e18 
+$Q1 = 60.0e3
+$Q2 = 115.0e3
+
+$B = 2*3.5e-25 * yearinsec*1.0e18
+
+$T_ref = 200.0                                         ! [K]  
+$CapA = 7.253                                          ! [J kg-1 K-2]
+$CapB = 146.3                                          ! [J kg-1 K-1]
+
+$ function KCC_Output(t) {\
+  t1 = 2015;\
+  t2 = 2016;\
+  if (t == t1 | t == t2) {\
+    _KCC_Output = 1 ;\
+  } else {\
+    _KCC_Output = -1 ;\
+  }\
+}
+
+$ function KCI_Output(t) {\
+  t1 = 2008;\
+  t2 = 2009;\
+  t3 = 2016;\
+  if (t == t1 | t==t2 | t==t3) {\
+    _KCI_Output = 1 ;\
+  } else {\
+    _KCI_Output = -1 ;\
+  }\
+}
+
+$ function KCH_Output(t) {\
+  t1 = 1998;\
+  t2 = 1998;\
+  if (t == t1 | t == t2) {\
+    _KCH_Output = 1 ;\
+  } else {\
+    _KCH_Output = -1 ;\
+  }\
+}
+
+$ function KCS_Output(t) {\
+  t1 = 1997;\
+  t2 = 1998;\
+  t3 = 1998;\
+  if (t == t1 | t == t2 | t == t3) {\
+    _KCS_Output = 1 ;\
+  } else {\
+    _KCS_Output = -1 ;\
+  }\
+}
+
+$ function CC_Output(t) {\
+  t1 = 1992;\
+  t2 = 2008;\
+  t3 = 2009;\
+  if (t == t1 | t == t2 | t == t3) {\
+    _CC_Output = 1 ;\
+  } else {\
+    _CC_Output = -1 ;\
+  }\
+}
+
+$ function CG03_Output(t) {\
+  t1 = 2004;\
+  t2 = 2005;\
+  if (t == t1 | t == t2) {\
+    _CG03_Output = 1 ;\
+  } else {\
+    _CG03_Output = -1 ;\
+  }\
+}
+
+$ function CG82_Output(t) {\
+  t1 = 1983;\
+  if (t == t1) {\
+    _CG82_Output = 1 ;\
+  } else {\
+    _CG82_Output = -1 ;\
+  }\
+}
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! HEADER
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Header
+  Mesh DB "." "cgnifetti"
+  
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! CONSTANTS
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Constants
+  Gravity = Real $gravity
+  Ice Density = Real $rhoi
+  
+  Density Name = String "Relative Density"
+  
+  Pressure Variable = String "Pressure"
+  
+  T_ref_enthalpy = Real $T_ref                         ! [K]
+  L_heat = Real $334000.0 * yearinsec^2                ! [J kg-1] -> [m2 a-2]  
+
+  ! Cp(T) = A*T + B
+  Enthalpy Heat Capacity A = Real $CapA * yearinsec^2  ! [J kg-1 K-2] -> [m2 a-2 K-2]
+  Enthalpy Heat Capacity B = Real $CapB * yearinsec^2  ! [J kg-1 K-1] -> [m2 a-2 K-1]
+
+  ! K(rho) = A*rho^2 + B*rho + C
+  Enthalpy Heat Conductivity A = Real $2.5e-6 * 1.0e6*yearinsec^5
+  Enthalpy Heat Conductivity B = Real $-1.23e-4 * yearinsec^3
+  Enthalpy Heat Conductivity C = Real $0.024 * 1.0e-6*yearinsec
+  
+  P_triple = Real 6.11e-4                              ! Triple point pressure for water [MPa]
+  T_triple = Real 273.16                               ! Temperature of water triple point [K]
+  P_surf = Real 0.1013                                 ! Surface atmospheric pressure [MPa]
+  Beta_clapeyron = Real 0.0974                         ! clausus clapeyron relationship [K MPa-1]
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! SIMULATION
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Simulation
+  Coordinate System  = "Cartesian 3D"
+  Coordinate Mapping(3) = Integer 1 2 3
+  
+  Simulation Type = Transient
+  Timestepping Method = "bdf"
+  BDF Order = 1
+ 
+  $output_intervals = 10
+
+  Timestep Intervals = 115 
+  Output Intervals = $output_intervals
+  Timestep Sizes = 1 
+ 
+  Extruded Mesh Levels = Integer 16 
+  !Extruded Mesh Ratio = 0.2  
+  
+  Steady State Max Iterations = 1
+  Steady State Min Iterations = 1
+
+  Output File = "cgnifetti_forcing.result"
+  Post File = "cgnifetti_forcing.vtu" 
+  
+  max output level = 20  
+  Save Geometry Ids = Logical True  
+  
+  Restart File = "cgnifetti.result" 
+  Restart Position = 0 
+  Restart Time = Real 1901.0 
+  Restart Before Initial Conditions = Logical False 
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! SOLVERS
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Solver 1
+  Equation = "Read DEMs"
+  Exec Solver = "Before Simulation"
+  Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
+
+  ! Bedrock DEM
+  Variable 1 = String "BedDEM"
+  Variable 1 data file = File "DATA/BedrockDEM.dat"
+  Variable 1 x0 = Real 633300.0d0
+  Variable 1 y0 = Real 86050.0d0
+  Variable 1 lx = Real 850.0
+  Variable 1 ly = Real 800.0 
+  Variable 1 Nx = Integer 426
+  Variable 1 Ny = Integer 401
+  Variable 1 Invert = Logical False 
+  Variable 1 Fill = Logical False 
+  Variable 1 Position Tol = Real 1.0e-1
+  Variable 1 No Data = Real 9999.0
+  Variable 1 No Data Tol = Real 1.0 
+
+  ! Surface DEM
+  Variable 2 = String "ZsDEM"
+  Variable 2 data file = File "DATA/SurfaceDEM.dat"
+  Variable 2 x0 = Real 633300.0d0
+  Variable 2 y0 = Real 86050.0d0
+  Variable 2 lx = Real 850.0
+  Variable 2 ly = Real 800.0 
+  Variable 2 Nx = Integer 426
+  Variable 2 Ny = Integer 401
+  Variable 2 Invert = Logical False 
+  Variable 2 Fill = Logical False 
+  Variable 2 Position Tol = Real 1.0e-1
+  Variable 2 No Data = Real 9999.0
+  Variable 2 No Data Tol = Real 1.0     
+  
+  ! Temperature DEM
+  Variable 3 = String "SurfaceTemperatureDEM"
+  Variable 3 data file = File "DATA/SurfaceTemperatureDEM.dat"
+  Variable 3 x0 = Real 633300.0d0
+  Variable 3 y0 = Real 86050.0d0
+  Variable 3 lx = Real 850.0
+  Variable 3 ly = Real 800.0 
+  Variable 3 Nx = Integer 426
+  Variable 3 Ny = Integer 401
+  Variable 3 Invert = Logical False 
+  Variable 3 Fill = Logical False 
+  Variable 3 Position Tol = Real 1.0e-1
+  Variable 3 No Data = Real 9999.0
+  Variable 3 No Data Tol = Real 1.0   
+  
+  ! Basal Heat Flux DEM
+  Variable 4 = String "BasalHeatFluxDEM"
+  Variable 4 data file = File "DATA/BasalHeatFluxDEM.dat"
+  Variable 4 x0 = Real 633300.0d0
+  Variable 4 y0 = Real 86050.0d0
+  Variable 4 lx = Real 850.0
+  Variable 4 ly = Real 800.0 
+  Variable 4 Nx = Integer 426
+  Variable 4 Ny = Integer 401
+  Variable 4 Invert = Logical False 
+  Variable 4 Fill = Logical False 
+  Variable 4 Position Tol = Real 1.0e-1
+  Variable 4 No Data = Real 9999.0
+  Variable 4 No Data Tol = Real 1.0     
+End 
+
+
+Solver 2
+  Equation = "MapCoordinate"
+  Exec Solver = "Before Simulation" 
+  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
+
+  Active Coordinate = Integer 3
+  Mesh Velocity Variable = String "dSdt"                        
+  Mesh Update Variable = String "dS"                            
+  Mesh Velocity First Zero = Logical True
+  
+  Displacement Mode = Logical False
+  Correct Surface = Logical True
+  Minimum Height = Real 1.0  
+End
+
+
+Solver 3
+  Equation = "Flowdepth"
+  Exec Solver = "Before Simulation" 
+  Procedure = File "ElmerIceSolvers" "FlowDepthSolver"
+  
+  Variable = String "Depth"
+  Variable DOFs = 1
+  
+  Linear System Solver = "Direct"
+  Linear System Direct Method = "Mumps"   !"Umfpack"
+  
+  Gradient = Real -1.0E00
+  
+  !Calc Free Surface = Logical True
+  !Freesurf Name = String "FreeSurf"
+End
+
+
+Solver 4
+  Equation = "NormalVector"
+  Exec Solver = "Before Simulation" 
+  Procedure = "ElmerIceSolvers" "ComputeNormalSolver"
+  
+  Variable = String "Normal Vector"   
+  Variable DOFs = 3 
+
+  Optimize Bandwidth = Logical False     
+  ComputeAll = Logical False
+End
+
+
+Solver 5
+  Equation = DeformationalHeat
+  !Exec Solver = "Never"
+  
+  Variable = W
+  Variable DOFs = 1
+
+  Procedure = File "Solvers/DeformationalHeat_Porous" "DeformationalHeatSolver"
+
+  Linear System Solver = direct
+  Linear System direct Method = umfpack  
+End
+
+
+Solver 6
+  Equation = String "Enthalpy Equation"
+  Procedure = File "ElmerIceSolvers" "EnthalpySolver"
+  !Exec Solver = "Never"
+    
+  Variable = String "Enthalpy_h"
+
+  Apply Dirichlet = Logical True
+  !Stabilize = True
+  
+  Enthalpy_h Convection Field = String "Porous"
+  
+  Exported Variable 1 = String "Phase Change Enthalpy" ! (J kg-1)
+  Exported Variable 1 DOFs = 1
+
+  Exported Variable 2 = String "Water Content" ! (%)
+  Exported Variable 2 DOFs = 1
+
+  Exported Variable 3 = String "Temperature" ! (°C)
+  Exported Variable 3 DOFs = 1
+  
+  Nonlinear Update Exported Variables = Logical True
+    
+  Linear System Solver = "Direct"
+  Linear System Direct Method = "Mumps"
+  
+  Steady State Convergence Tolerance = 1.0E-04
+  Nonlinear System Convergence Tolerance = 1.0E-03
+  Nonlinear System Max Iterations = 10
+  Nonlinear System Relaxation Factor = Real 1.0
+End
+
+
+Solver 7
+  Equation = String "PorousFlow"
+  !Exec Solver = "Never"
+  
+  Procedure = "ElmerIceSolvers" "PorousSolver"
+
+  Variable = "Porous"[Velocity:3 Pressure:1]
+  
+  Optimize Bandwidth = False
+  !Use p elements
+  !Element = "p:1 b:4"
+  !Stabilization Method = String "pBubbles" 
+   
+  Exported Variable 1 = -dofs 1 "ZsDEM"
+  Exported Variable 2 = -dofs 1 "BedDEM"
+  Exported Variable 3 = -dofs 1 "SurfaceTemperatureDEM"
+  Exported Variable 4 = -dofs 1 "BasalHeatFluxDEM"
+  
+  Exported Variable 5 = -dofs 1 "dSdt" 
+  Exported Variable 6 = -dofs 1 "dS" 
+  
+  Exported Variable 7 = "StrainRate"
+  Exported variable 7 DOFs = Integer 6
+  
+  Exported Variable 8 = String "DeviatoricStress"
+  Exported variable 8 DOFs = Integer 6
+  
+  Linear System Solver = "Direct"
+  Linear System Direct Method = "Mumps"
+  Mumps percentage increase working space = Integer 60
+
+  Nonlinear System Convergence Tolerance = 1.0E-05
+  Nonlinear System Max Iterations = 50
+
+  Steady State Convergence Tolerance = 1.0E-03    
+End
+
+
+Solver 8
+  Equation = "AdvReact"
+  !Exec Solver = "Never"
+  Procedure = File "Solvers/LocalAdvectionReaction" "AdvectionReactionSolver"
+
+  Variable = "Relative Density"
+
+  !Discontinuous Galerkin = Logical False
+  !Stabilized = Logical True
+  Bubbles = Logical True
+  
+  Limit Solution = Logical True
+
+  Linear System Solver = "Direct" 
+  Linear System Direct Method = "Mumps"   !"Umfpack"
+
+  Nonlinear System Max Iterations = 40
+  Nonlinear System Min Iterations = 2
+  Nonlinear System Convergence Tolerance = 1.0e-04 
+  
+  Steady State Convergence Tolerance = 1.0e-03      
+End
+
+
+Solver 9
+  Equation = "SaveSurfaceData"
+  Exec Interval = $output_intervals
+  Procedure = File "SaveData" "SaveLine"  
+  
+  Filename = "cgnifetti/SaveData/Surface_forcing.dat"
+  File Append = Logical True
+  
+  Variable 1 = String "Coordinate 1"  
+  Variable 2 = String "Coordinate 2"  
+  Variable 3 = String "Relative Density"
+  Variable 4 = String "Velocity 1"
+  Variable 5 = String "Velocity 2"
+  Variable 6 = String "Velocity 3"  
+  
+  Variable 7 = String "Temperature"
+   
+  Save Mask = String "Surface"
+End
+
+
+Solver 10
+  Equation = "SaveKCC_strain_stress"
+  Exec Interval = $output_intervals
+  Procedure = File "Solvers/KCC_strain_stress_SaveData" "SaveLine"
+
+  Filename = "cgnifetti/SaveData/KCC_strain_stress.dat"
+  File Append = Logical True
+  Polyline Coordinates(2,3) = 633948 86465 4000 633948 86465 4700
+  
+  Variable 1 = String "Depth"
+  
+  Variable 2 = String "StrainRate 1"
+  Variable 3 = String "StrainRate 2"
+  Variable 4 = String "StrainRate 3"
+  Variable 5 = String "StrainRate 4"
+  Variable 6 = String "StrainRate 5"
+  Variable 7 = String "StrainRate 6"
+  
+  Variable 8 = String "DeviatoricStress 1"
+  Variable 9 = String "DeviatoricStress 2"
+  Variable 10 = String "DeviatoricStress 3"
+  Variable 11 = String "DeviatoricStress 4"
+  Variable 12 = String "DeviatoricStress 5"
+  Variable 13 = String "DeviatoricStress 6"
+  
+  Save Mask = String "KCC_strain_stress"  
+End
+
+
+Solver 11
+  Equation = "SaveKCCData"
+  Exec Condition = Variable "Time"
+    Real MATC "KCC_Output(tx)"
+    
+  Procedure = File "Solvers/KCCSaveData" "SaveLine"
+
+  Filename = "cgnifetti/SaveData/KCC_forcing.dat"
+  File Append = Logical True
+  Polyline Coordinates(2,3) = 633948 86465 4000 633948 86465 4700
+  
+  Variable 1 = String "Depth"
+  Variable 2 = String "Relative Density"
+  Variable 3 = String "Temperature"
+  Variable 4 = String "Velocity 1"
+  Variable 5 = String "Velocity 2"
+  Variable 6 = String "Velocity 3"  
+  
+  Save Mask = String "KCC"  
+End
+
+
+Solver 12
+  Equation = "SaveKCIData"
+  Exec Condition = Variable "Time"
+    Real MATC "KCI_Output(tx)"
+    
+  Procedure = File "Solvers/KCISaveData" "SaveLine"
+
+  Filename = "cgnifetti/SaveData/KCI_forcing.dat"
+  File Append = Logical True
+  Polyline Coordinates(2,3) = 634001 86554 4000 634001 86554 4700
+  
+  Variable 1 = String "Depth"
+  Variable 2 = String "Relative Density"
+  Variable 3 = String "Temperature"
+  Variable 4 = String "Velocity 1"
+  Variable 5 = String "Velocity 2"
+  Variable 6 = String "Velocity 3"
+    
+  Save Mask = String "KCI"  
+End
+
+
+Solver 13
+  Equation = "SaveKCHData"
+  Exec Condition = Variable "Time"
+    Real MATC "KCH_Output(tx)"
+    
+  Procedure = File "Solvers/KCHSaveData" "SaveLine"
+
+  Filename = "cgnifetti/SaveData/KCH_forcing.dat"
+  File Append = Logical True
+  Polyline Coordinates(2,3) = 633922 86383 4000 633922 86383 4700
+  
+  Variable 1 = String "Depth"
+  Variable 2 = String "Relative Density"
+  Variable 3 = String "Temperature"
+  Variable 4 = String "Velocity 1"
+  Variable 5 = String "Velocity 2"
+  Variable 6 = String "Velocity 3"
+    
+  Save Mask = String "KCH"  
+End
+
+
+Solver 14
+  Equation = "SaveKCSData"
+  Exec Condition = Variable "Time"
+    Real MATC "KCS_Output(tx)"
+    
+  Procedure = File "Solvers/KCSSaveData" "SaveLine"
+
+  Filename = "cgnifetti/SaveData/KCS_forcing.dat"
+  File Append = Logical True
+  Polyline Coordinates(2,3) = 633745 86484 4000 633745 86484 4700
+  
+  Variable 1 = String "Depth"
+  Variable 2 = String "Relative Density"
+  Variable 3 = String "Temperature"
+  Variable 4 = String "Velocity 1"
+  Variable 5 = String "Velocity 2"
+  Variable 6 = String "Velocity 3"
+    
+  Save Mask = String "KCS"  
+End
+
+
+Solver 15
+  Equation = "SaveCCData"
+  Exec Condition = Variable "Time"
+    Real MATC "CC_Output(tx)"
+    
+  Procedure = File "Solvers/CCSaveData" "SaveLine"
+
+  Filename = "cgnifetti/SaveData/CC_forcing.dat"
+  File Append = Logical True
+  Polyline Coordinates(2,3) = 633871 86417 4000 633871 86417 4700
+  
+  Variable 1 = String "Depth"
+  Variable 2 = String "Relative Density"
+  Variable 3 = String "Temperature"
+  Variable 4 = String "Velocity 1"
+  Variable 5 = String "Velocity 2"
+  Variable 6 = String "Velocity 3"
+    
+  Save Mask = String "CC"  
+End
+
+
+Solver 16
+  Equation = "SaveCG03Data"
+  Exec Condition = Variable "Time"
+    Real MATC "CG03_Output(tx)"
+    
+  Procedure = File "Solvers/CG03SaveData" "SaveLine"
+
+  Filename = "cgnifetti/SaveData/CG03_forcing.dat"
+  File Append = Logical True
+  Polyline Coordinates(2,3) = 633847 86524 4000 633847 86524 4700
+  
+  Variable 1 = String "Depth"
+  Variable 2 = String "Relative Density"
+  Variable 3 = String "Temperature"
+  Variable 4 = String "Velocity 1"
+  Variable 5 = String "Velocity 2"
+  Variable 6 = String "Velocity 3"
+    
+  Save Mask = String "CG03"  
+End
+
+
+Solver 17
+  Equation = "SaveCG82Data"
+  Exec Condition = Variable "Time"
+    Real MATC "CG82_Output(tx)"
+    
+  Procedure = File "Solvers/CG82SaveData" "SaveLine"
+
+  Filename = "cgnifetti/SaveData/CG82_forcing.dat"
+  File Append = Logical True
+  Polyline Coordinates(2,3) = 633798 86576 4000 633798 86576 4700
+  
+  Variable 1 = String "Depth"
+  Variable 2 = String "Relative Density"
+  Variable 3 = String "Temperature"
+  Variable 4 = String "Velocity 1"
+  Variable 5 = String "Velocity 2"
+  Variable 6 = String "Velocity 3"
+    
+  Save Mask = String "CG82"  
+End
+
+
+Solver 18
+  Equation = "SaveNorm"
+  Exec Solver = "After Timestep"
+  Procedure = File "Solvers/NormSaveData" "SaveScalars"
+  
+  Filename = "cgnifetti/SaveData/Norm.dat"
+  File Append = Logical True
+
+  Variable 1 = String "Porous"
+  Variable 2 = String "Time"
+  
+  Operator 1 = String "Norm"
+  
+  Parallel Reduce = Logical True  
+End 
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! BODIES (i.e., domains to compute on)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! The glacier
+Body 1
+  Equation = 1
+  Material = 1
+  Body Force = 1
+  Initial Condition = 1
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! EQUATION
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Equation 1
+  Active Solvers(18) = 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18
+  Flow Solution Name = String "Porous" 
+  Convection = String "Computed"
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! INITIAL CONDITIONS
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Initial Condition 1
+  Velocity 1 = Equals "Velocity 1"
+  Velocity 2 = Equals "Velocity 2"
+  Velocity 3 = Equals "Velocity 3"
+  Pressure = Equals "Pressure"
+  
+  Relative Density = Equals "Relative Density"
+  
+  Enthalpy_h = Equals "Enthalpy_h"                     ! [m2 a-2]
+  
+  Temperature = Equals "Temperature"
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! BODY FORCE
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body Force 1
+  Porous Force 1 = Real 0.0E00
+  Porous Force 2 = Real 0.0E00
+  Porous Force 3 = Real $gravity*rhoi 
+  
+  Relative Density Source = Real 0.0 
+  
+  Heat Source = Equals "W"                             ! [W Kg-1] -> [m2 a-3]  
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! MATERIAL
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Material 1
+  Powerlaw Exponent = Real 3.0
+  Min Second Invariant = Real 1.0E-10
+  
+  !B = 2 A, where A is the classical Glen's fluidity
+  !MPa{^-3}a{^-1}
+  Fluidity Parameter = Variable "Temperature"                                
+    Real Procedure "USFs/USF_Fluidity_B" "Fluidity_B"   
+    
+  Relative Density Upper Limit = Real 1.0
+  Relative Density Lower Limit = Real 0.4
+  Relative Density Gamma = Real 0.0
+
+  Enthalpy Density = Real $rhoi                                             
+  Enthalpy Heat Diffusivity = Variable Temperature, Relative Density        ! = k / Cp [kg m-1 s-1] -> [MPa * a]                         
+    Real Procedure "USFs/USF_EnthalpyDiffusivity" "Get_EnthalpyDiffusivity"  
+  
+  Enthalpy Water Diffusivity = Real $1.045e-4 / (1.0e6*yearinsec)           ! [kg m-1 s-1] -> [MPa * a]
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! BOUNDARY CONDITIONS
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! Bergschrund 
+Boundary Condition 1
+  Target Boundaries = 1  
+
+End
+
+! Grenzgletscher outflow 
+Boundary Condition 2
+  Target Boundaries = 2  
+  
+  Crevasse Depth = Real 30.0          ! Regions along the boundary where to apply crevasse depth
+  Stress Gradient = Real -0.010       ! and stress gradient are defined in the USF   
+  
+  ComputeNormal = Logical True  
+  Normal Force = Variable Depth, Relative Density, Coordinate 2                                 
+    Real Procedure "USFs/USF_NormalForce" "CalcNormalForce"      
+  
+  Save Line = Logical True
+  GGSurface = Logical True   
+End
+
+! Zumsteinspitze 
+Boundary Condition 3
+  Target Boundaries = 3
+  
+End
+
+! Ice cliff 
+Boundary Condition 4
+  Target Boundaries = 4
+   
+End
+
+! Bedrock 
+Boundary Condition 5
+  Bottom Surface = Equals "BedDEM" 
+  
+  !Glacier frozen to bedrock
+  ComputeNormal = Logical True
+  Normal-Tangential Porous = Logical True
+  Velocity 1 = Real 0.0                                         
+  Velocity 2 = Real 0.0
+  Velocity 3 = Real 0.0    
+  
+  Enthalpy Heat Flux BC = Logical True
+  Enthalpy Heat Flux = Variable "BasalHeatFluxDEM"                 ! [W m-2] -> [MPa m a-1]
+    Real MATC "tx * yearinsec / 1.0e6"
+End
+
+! Upper Surface
+Boundary Condition 6
+  Top Surface = Equals "ZsDEM"
+  
+  Depth = Real 0.0
+  Relative Density = Real 0.40                                     
+
+  Melt Factor = Real $1500 * yearinsec^2                           ! [J kg-1 C-1] -> [m2 a-2 C-1]
+  
+  Enthalpy_h = Variable "SurfaceTemperatureDEM", "Time"            ! [J kg-1] -> [m2 a-2] 
+    Real Procedure "USFs/USF_SurfaceEnthalpy_yearly" "Get_SurfaceEnthalpy"  
+   
+  Save Line = Logical True
+  Surface = Logical True
+End

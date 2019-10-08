@@ -1,0 +1,400 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Colle Gnifetti Ice Flow Model
+!
+! All units are in MPa - m - a 
+! Temperature is in Kelvin
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+check keywords warn
+ echo on
+
+!Define the parameter in MPa - a - m
+$yearinsec = 365.25*24*60*60
+$gravity = -9.81*yearinsec^2
+$rhoi = 900.0/(1.0e6*yearinsec^2)
+$rhow = 1000.0/(1.0e6*yearinsec^2) 
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! HEADER
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Header
+  Mesh DB "." "cgnifetti"
+  
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! CONSTANTS
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Constants
+  Gravity = Real $gravity
+  Ice Density = Real $rhoi
+  
+  Density Name = String "Relative Density"
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! SIMULATION
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Simulation
+  Coordinate System  = "Cartesian 3D"
+  Coordinate Mapping(3) = Integer 1 2 3
+  
+  Simulation Type = "Steady"
+ 
+  Extruded Mesh Levels = Integer 16 
+  !Extruded Mesh Ratio = 0.2  
+  
+  Steady State Max Iterations = 1
+  Steady State Min Iterations = 1
+
+  Output File = "cgnifetti_age.result"
+  Post File = "cgnifetti_age.vtu"
+
+  max output level = 20  
+  !Save Geometry Ids = Logical True  
+  
+  Restart File = "cgnifetti_forcing.result"
+  Restart Position = 0
+  Restart Time = Real 0.0
+  Restart Before Initial Conditions = Logical True
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! SOLVERS
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Solver 1
+  Equation = "Read DEMs"
+  Exec Solver = "Before Simulation"
+  Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
+
+  ! Bedrock DEM
+  Variable 1 = String "BedDEM"
+  Variable 1 data file = File "DATA/BedrockDEM.dat"
+  Variable 1 x0 = Real 633300.0d0
+  Variable 1 y0 = Real 86050.0d0
+  Variable 1 lx = Real 850.0
+  Variable 1 ly = Real 800.0 
+  Variable 1 Nx = Integer 426
+  Variable 1 Ny = Integer 401
+  Variable 1 Invert = Logical False 
+  Variable 1 Fill = Logical False 
+  Variable 1 Position Tol = Real 1.0e-1
+  Variable 1 No Data = Real 9999.0
+  Variable 1 No Data Tol = Real 1.0 
+
+  ! Surface DEM
+  Variable 2 = String "ZsDEM"
+  Variable 2 data file = File "DATA/SurfaceDEM.dat"
+  Variable 2 x0 = Real 633300.0d0
+  Variable 2 y0 = Real 86050.0d0
+  Variable 2 lx = Real 850.0
+  Variable 2 ly = Real 800.0 
+  Variable 2 Nx = Integer 426
+  Variable 2 Ny = Integer 401
+  Variable 2 Invert = Logical False 
+  Variable 2 Fill = Logical False 
+  Variable 2 Position Tol = Real 1.0e-1
+  Variable 2 No Data = Real 9999.0
+  Variable 2 No Data Tol = Real 1.0     
+End 
+
+
+Solver 2
+  Equation = "MapCoordinate"
+  Exec Solver = "Before Simulation" 
+  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
+
+  Active Coordinate = Integer 3
+  Mesh Velocity Variable = String "dSdt"                        
+  Mesh Update Variable = String "dS"                            
+  Mesh Velocity First Zero = Logical True
+  
+  Displacement Mode = Logical False
+  Correct Surface = Logical True
+  Minimum Height = Real 1.0  
+End
+
+
+Solver 3
+  Equation = "Flowdepth"
+  Exec Solver = "Before Simulation" 
+  Procedure = File "ElmerIceSolvers" "FlowDepthSolver"
+  
+  Variable = String "Depth"
+  Variable DOFs = 1
+  
+  Linear System Solver = "Direct"
+  Linear System Direct Method = "UMFPACK"
+  
+  Gradient = Real -1.0E00
+  
+  !Calc Free Surface = Logical True
+  !Freesurf Name = String "FreeSurf"
+End
+
+
+Solver 4
+  Equation = "NormalVector"
+  Exec Solver = "Before Simulation" 
+  Procedure = "ElmerIceSolvers" "ComputeNormalSolver"
+  
+  Variable = String "Normal Vector"   
+  Variable DOFs = 3 
+
+  Optimize Bandwidth = Logical False     
+  ComputeAll = Logical False
+End
+
+
+Solver 5
+  Equation = "Strain Rate"
+  Procedure = "ElmerIceSolvers" "ComputeStrainRate"
+! this is just a dummy, hence no output is needed
+!-----------------------------------------------------------------------  
+  Variable = -nooutput "Eij"
+  Variable DOFs = 1
+
+  Exported Variable 1 = "StrainRate"
+  Exported Variable 1 DOFs = 7
+
+! the name of the variable containing the flow solution (U,V,W,Pressure)
+!-----------------------------------------------------------------------
+  Flow Solver Name = String "Porous"
+! the name of the strain-rate solution (default is 'StrainRate')
+  StrainRate Variable Name = String "StrainRate"
+  
+  Linear System Solver = Direct
+  Linear System Direct Method = umfpack
+End
+
+
+Solver 6
+  Equation = "AdvReact dating"
+  Procedure = File "Solvers/LocalAdvectionReaction_dating" "AdvectionReactionSolver"
+
+  Variable = "Age"
+  
+  !Discontinuous Galerkin = Logical True
+  Stabilized = Logical True
+  !Bubbles = Logical True
+  
+  Limit Solution = Logical True
+
+  Linear System Solver = Direct 
+  Nonlinear System Max Iterations = 40
+  Nonlinear System Min Iterations = 2
+  Nonlinear System Convergence Tolerance = 1.0e-04 
+  
+  Steady State Convergence Tolerance = 1.0e-03        
+End
+
+
+Solver 7
+  Equation = "SaveKCCData"
+  Exec Solver = "After Simulation" 
+  Procedure = File "Solvers/KCCSaveData" "SaveLine"
+
+  Filename = "cgnifetti/SaveData/KCC_age.dat"
+  File Append = Logical False
+  Polyline Coordinates(2,3) = 633948 86465 4000 633948 86465 4700
+  
+  Variable 1 = String "Depth"
+  Variable 2 = String "Velocity 1"
+  Variable 3 = String "Velocity 2"
+  Variable 4 = String "Velocity 3"
+  Variable 5 = String "Age" 
+  Variable 6 = String "StrainRate 7"
+  
+  Save Mask = String "KCC"  
+End
+
+
+Solver 8
+  Equation = "SaveKCIData"
+  Exec Solver = "After Simulation" 
+  Procedure = File "Solvers/KCISaveData" "SaveLine"
+
+  Filename = "cgnifetti/SaveData/KCI_age.dat"
+  File Append = Logical False
+  Polyline Coordinates(2,3) = 634001 86554 4000 634001 86554 4700
+  
+  Variable 1 = String "Depth"
+  Variable 2 = String "Velocity 1"
+  Variable 3 = String "Velocity 2"
+  Variable 4 = String "Velocity 3"
+  Variable 5 = String "Age" 
+    
+  Save Mask = String "KCI"  
+End
+
+
+Solver 9
+  Equation = "SaveKCHData"
+  Exec Solver = "After Simulation" 
+  Procedure = File "Solvers/KCHSaveData" "SaveLine"
+
+  Filename = "cgnifetti/SaveData/KCH_age.dat"
+  File Append = Logical False
+  Polyline Coordinates(2,3) = 633922 86383 4000 633922 86383 4700
+  
+  Variable 1 = String "Depth"
+  Variable 2 = String "Velocity 1"
+  Variable 3 = String "Velocity 2"
+  Variable 4 = String "Velocity 3"
+  Variable 5 = String "Age"  
+    
+  Save Mask = String "KCH"  
+End
+
+
+Solver 10
+  Equation = "SaveKCSData"
+  Exec Solver = "After Simulation" 
+  Procedure = File "Solvers/KCSSaveData" "SaveLine"
+
+  Filename = "cgnifetti/SaveData/KCS_age.dat"
+  File Append = Logical False
+  Polyline Coordinates(2,3) = 633745 86484 4000 633745 86484 4700
+  
+  Variable 1 = String "Depth"
+  Variable 2 = String "Velocity 1"
+  Variable 3 = String "Velocity 2"
+  Variable 4 = String "Velocity 3"
+  Variable 5 = String "Age"
+    
+  Save Mask = String "KCS"  
+End
+
+
+Solver 11
+  Equation = "SaveCCData"
+  Exec Solver = "After Simulation" 
+  Procedure = File "Solvers/CCSaveData" "SaveLine"
+
+  Filename = "cgnifetti/SaveData/CC_age.dat"
+  File Append = Logical False
+  Polyline Coordinates(2,3) = 633871 86417 4000 633871 86417 4700
+  
+  Variable 1 = String "Depth"
+  Variable 2 = String "Velocity 1"
+  Variable 3 = String "Velocity 2"
+  Variable 4 = String "Velocity 3"
+  Variable 5 = String "Age"
+    
+  Save Mask = String "CC"  
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! BODIES (i.e., domains to compute on)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! The glacier
+Body 1
+  Equation = 1
+  Material = 1
+  Body Force = 1
+  Initial Condition = 1
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! EQUATION
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Equation 1
+  Active Solvers(11) = 1 2 3 4 5 6 7 8 9 10 11
+  Flow Solution Name = String "Porous" 
+  Convection = Computed
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! INITIAL CONDITIONS
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Initial Condition 1
+  Age = Real 0.0  
+  
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! BODY FORCE
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body Force 1
+  Age Source = Real 1.0
+
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! MATERIAL
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Material 1
+  Age Upper Limit = Real 4000
+  Age Lower Limit = Real 0
+  
+  ! This would be a reaction rate,
+  ! is equal to -tr(Eij) (minus trace of the strain-rate) 
+  ! in the case of an incompressible material (ice), it is then 0
+  Age Gamma = Variable "StrainRate 7"
+    Real MATC "-1*tx"
+
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! BOUNDARY CONDITIONS
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! Bergschrund 
+Boundary Condition 1
+  Target Boundaries = 1  
+
+End
+
+! Grenzgletscher outflow 
+Boundary Condition 2
+  Target Boundaries = 2  
+  
+  Crevasse Depth = Real 30.0          ! Regions along the boundary where to apply crevasse depth
+  Stress Gradient = Real -0.010       ! and stress gradient are defined in the USF   
+  
+  ComputeNormal = Logical True  
+  Normal Force = Variable Depth, Relative Density, Coordinate 2                                 
+    Real Procedure "USFs/USF_NormalForce" "CalcNormalForce"      
+End
+
+! Zumsteinspitze 
+Boundary Condition 3
+  Target Boundaries = 3
+  
+End
+
+! Ice cliff 
+Boundary Condition 4
+  Target Boundaries = 4
+   
+End
+
+! Bedrock 
+Boundary Condition 5
+  Bottom Surface = Equals "BedDEM" 
+  
+  !Glacier frozen to bedrock
+  ComputeNormal = Logical True
+  Normal-Tangential Porous = Logical True
+  Velocity 1 = Real 0.0                                         
+  Velocity 2 = Real 0.0
+  Velocity 3 = Real 0.0    
+End
+
+! Upper Surface
+Boundary Condition 6
+  Top Surface = Equals "ZsDEM"
+  
+  Depth = Real 0.0
+  Age = Real 0.0  
+End
